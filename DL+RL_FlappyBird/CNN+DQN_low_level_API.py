@@ -18,15 +18,14 @@ import cv2
 from matplotlib import pyplot as plt
 
 GAME = 'bird' # the name of the game being played for log files
-CONFIG = 'nothreshold'
 ACTIONS = 2 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVATION = 1000. # timesteps to observe before training
-EXPLORE = 300000. # frames over which to anneal epsilon
+EXPLORE = 200000. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.0001 # final value of epsilon
 INITIAL_EPSILON = 0.1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
-BATCH = 32 # size of minibatch
+BATCH = 256 # size of minibatch
 FRAME_PER_ACTION = 1
 
 
@@ -114,7 +113,7 @@ observation0, reward0, terminal = flappyBird.frame_step(action0)
 # state0 = np.stack((observation0, observation0, observation0, observation0), axis = 2)
 
 observation0 = cv2.cvtColor(observation0, cv2.COLOR_BGR2GRAY)
-observation0 = cv2.resize(observation0, (80, 80))
+observation0 = cv2.resize(observation0, (80, 80), interpolation = cv2.INTER_AREA)
 ret, observation0 = cv2.threshold(observation0, 10, 255, cv2.THRESH_BINARY)
 state0 = np.stack((observation0, observation0, observation0, observation0), axis = 2)
 
@@ -127,7 +126,10 @@ state_current = state0
 epsilon = INITIAL_EPSILON
 time = 0
 
+score = 0
 
+f = open("score.txt", 'a')
+f.write("\n")
 
 while (True):
 
@@ -158,7 +160,7 @@ while (True):
     # state_next = np.append(state_current[:, :, 1:], observation, axis = 2)
 
     observation = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
-    observation = cv2.resize(observation, (80, 80))
+    observation = cv2.resize(observation, (80, 80), interpolation = cv2.INTER_AREA)
     ret, observation = cv2.threshold(observation, 10, 255, cv2.THRESH_BINARY)
     # plt.imshow(observation, 'gray')
     # plt.show()
@@ -166,7 +168,11 @@ while (True):
     state_next = np.append(state_current[:, :, 1:], observation, axis = 2)
 
 
-
+    if reward == -1:
+        f.write(str(score) + ",")
+        score = 0
+    if reward == 1:
+        score += 1
 
 
 
