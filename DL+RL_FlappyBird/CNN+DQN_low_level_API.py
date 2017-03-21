@@ -14,12 +14,14 @@ from collections import deque
 
 import skimage as skimage
 from skimage import transform, color, exposure
+import cv2
+from matplotlib import pyplot as plt
 
 GAME = 'bird' # the name of the game being played for log files
 CONFIG = 'nothreshold'
 ACTIONS = 2 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
-OBSERVATION = 10000. # timesteps to observe before training
+OBSERVATION = 1000. # timesteps to observe before training
 EXPLORE = 300000. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.0001 # final value of epsilon
 INITIAL_EPSILON = 0.1 # starting value of epsilon
@@ -42,40 +44,49 @@ def conv2d(x, W, stride):
 def max_pool_2x2(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = "SAME")
 
+# input layer
+x_image = tf.placeholder(tf.float32, shape = [None, 80, 80, 4])
 
-
+# first convolution layer
 W_conv1 = weight_variable([8, 8, 4, 32])
 b_conv1 = bias_variable([32])
 
-x_image = tf.placeholder(tf.float32, shape = [None, 80, 80, 4])
-
 h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1, 4) + b_conv1)
-#h_pool1 = max_pool_2x2(h_conv1)
+h_pool1 = max_pool_2x2(h_conv1)
 
+# second convolution layer
 W_conv2 = weight_variable([4, 4, 32, 64])
 b_conv2 = bias_variable([64])
 
-h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
-#h_pool2 = max_pool_2x2(h_conv2)
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2, 2) + b_conv2)
+h_pool2 = max_pool_2x2(h_conv2)
 
+# third convolution layer
 W_conv3 = weight_variable([3, 3, 64, 64])
 b_conv3 = bias_variable([64])
 
-h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1))
+h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3, 1) + b_conv3)
+h_pool3 = max_pool_2x2(h_conv3)
 
-W_fc1 = weight_variable([10 * 10 * 64, 512])
+# reshape
+h_pool3_flat = tf.reshape(h_pool3, [-1, 2 * 2 * 64])
+
+# first fully connected layer
+W_fc1 = weight_variable([2 * 2 * 64, 512])
 b_fc1 = bias_variable([512])
 
-h_conv3_flat = tf.reshape(h_conv3, [-1, 10 * 10 * 64])
-h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
+h_fc1 = tf.nn.relu(tf.matmul(h_pool3_flat, W_fc1) + b_fc1)
 
+# drop
 #keep_prob = tf.placeholder(tf.float32)
-#h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
+#h_fc1_drop = tf.nn.dropout(h_fc1, 0.5)
 
+# output layer
 W_fc2 = weight_variable([512, 2])
 b_fc2 = bias_variable([2])
 
 Q_output = tf.matmul(h_fc1, W_fc2) + b_fc2
+
 
 action_for_train = tf.placeholder(tf.float32, shape = [None, ACTIONS])
 Q_target = tf.placeholder(tf.float32, shape = [None])
@@ -97,11 +108,19 @@ action0[0] = 1
 
 observation0, reward0, terminal = flappyBird.frame_step(action0)
 
-observation0 = skimage.color.rgb2gray(observation0)
-observation0 = skimage.transform.resize(observation0, (80, 80))
-observation0 = skimage.exposure.rescale_intensity(observation0, out_range = (0, 255))
+# observation0 = skimage.color.rgb2gray(observation0)
+# observation0 = skimage.transform.resize(observation0, (80, 80))
+# observation0 = skimage.exposure.rescale_intensity(observation0, out_range = (0, 255))
+# state0 = np.stack((observation0, observation0, observation0, observation0), axis = 2)
 
+observation0 = cv2.cvtColor(observation0, cv2.COLOR_BGR2GRAY)
+observation0 = cv2.resize(observation0, (80, 80))
+ret, observation0 = cv2.threshold(observation0, 10, 255, cv2.THRESH_BINARY)
 state0 = np.stack((observation0, observation0, observation0, observation0), axis = 2)
+
+# plt.imshow(observation0,'gray')
+# plt.show()
+
 
 state_current = state0
 
@@ -132,11 +151,26 @@ while (True):
 
     observation, reward, terminal = flappyBird.frame_step(action)
 
-    observation = skimage.color.rgb2gray(observation)
-    observation = skimage.transform.resize(observation, (80, 80))
-    observation = skimage.exposure.rescale_intensity(observation, out_range=(0, 255))
+    # observation = skimage.color.rgb2gray(observation)
+    # observation = skimage.transform.resize(observation, (80, 80))
+    # observation = skimage.exposure.rescale_intensity(observation, out_range=(0, 255))
+    # observation = np.reshape(observation, (80, 80, 1))
+    # state_next = np.append(state_current[:, :, 1:], observation, axis = 2)
+
+    observation = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
+    observation = cv2.resize(observation, (80, 80))
+    ret, observation = cv2.threshold(observation, 10, 255, cv2.THRESH_BINARY)
+    # plt.imshow(observation, 'gray')
+    # plt.show()
     observation = np.reshape(observation, (80, 80, 1))
     state_next = np.append(state_current[:, :, 1:], observation, axis = 2)
+
+
+
+
+
+
+
 
     D.append((state_current, action, reward, state_next, terminal))
     if len(D) > REPLAY_MEMORY:
