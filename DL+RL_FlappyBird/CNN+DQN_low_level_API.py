@@ -30,11 +30,11 @@ FRAME_PER_ACTION = 1
 
 
 def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev = 0.1)
+    initial = tf.truncated_normal(shape, stddev = 0.01)
     return tf.Variable(initial)
 
 def bias_variable(shape):
-    initial = tf.constant(0.1, shape = shape)
+    initial = tf.constant(0.01, shape = shape)
     return tf.Variable(initial)
 
 def conv2d(x, W, stride):
@@ -127,7 +127,7 @@ epsilon = INITIAL_EPSILON
 time = 0
 
 score = 0
-
+max_score = 0
 f = open("score.txt", 'a')
 f.write("\n")
 
@@ -170,6 +170,8 @@ while (True):
 
     if reward == -1:
         f.write(str(score) + ",")
+        if score > max_score:
+            max_score = score
         score = 0
     if reward == 1:
         score += 1
@@ -230,4 +232,4 @@ while (True):
 
     print("TIMESTEP", time, "/ STATE", state, \
           "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", reward, \
-          "/ Q_MAX %e" % np.max(Q_value))
+          "/ Q_MAX %e" % np.max(Q_value), "/ MAX_SCORE", max_score, "SCORE", score)
