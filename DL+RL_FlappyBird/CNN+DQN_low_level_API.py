@@ -21,7 +21,7 @@ GAME = 'bird' # the name of the game being played for log files
 ACTIONS = 2 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVATION = 1000. # timesteps to observe before training
-EXPLORE = 200000. # frames over which to anneal epsilon
+EXPLORE = 300000. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.0001 # final value of epsilon
 INITIAL_EPSILON = 0.1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
@@ -77,14 +77,14 @@ b_fc1 = bias_variable([512])
 h_fc1 = tf.nn.relu(tf.matmul(h_pool3_flat, W_fc1) + b_fc1)
 
 # drop
-#keep_prob = tf.placeholder(tf.float32)
-#h_fc1_drop = tf.nn.dropout(h_fc1, 0.5)
+keep_prob = tf.placeholder(tf.float32)
+h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 # output layer
 W_fc2 = weight_variable([512, 2])
 b_fc2 = bias_variable([2])
 
-Q_output = tf.matmul(h_fc1, W_fc2) + b_fc2
+Q_output = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 
 
 action_for_train = tf.placeholder(tf.float32, shape = [None, ACTIONS])
@@ -133,7 +133,7 @@ f.write("\n")
 
 while (True):
 
-    Q_value = Q_output.eval(feed_dict = {x_image: [state_current]})
+    Q_value = Q_output.eval(feed_dict = {x_image: [state_current], keep_prob: 1.0})
     action = np.zeros(ACTIONS)
     action_index = 0
 
@@ -200,7 +200,7 @@ while (True):
             state_next_batch.append(minibatch[i][3])
             terminal_batch.append(minibatch[i][4])
 
-        Q_value_batch = Q_output.eval(feed_dict = {x_image: state_next_batch})
+        Q_value_batch = Q_output.eval(feed_dict = {x_image: state_next_batch, keep_prob: 1.0})
         Q_target_batch = []
         for i in range(0, len(minibatch)):
             if terminal_batch[i]:
@@ -213,7 +213,7 @@ while (True):
         # print (Q_target_batch)
         # print (sess.run(Q_value_for_train, feed_dict={x_image: state_current_batch, action_for_train:action_batch}))
         # print (sess.run(cost_function, feed_dict={x_image: state_current_batch, action_for_train:action_batch, Q_target: Q_target_batch}))
-        train_step.run(feed_dict = {x_image: state_current_batch, action_for_train: action_batch, Q_target: Q_target_batch})
+        train_step.run(feed_dict = {x_image: state_current_batch, action_for_train: action_batch, Q_target: Q_target_batch, keep_prob: 0.5})
         # print ("train")
 
 
