@@ -57,28 +57,28 @@ W_conv1 = weight_variable([8, 8, 4, 32])
 b_conv1 = bias_variable([32])
 
 h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1, 4) + b_conv1)
-h_pool1 = max_pool_2x2(h_conv1)
+# h_pool1 = max_pool_2x2(h_conv1)
 
 # second convolution layer
 W_conv2 = weight_variable([4, 4, 32, 64])
 b_conv2 = bias_variable([64])
 
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2, 2) + b_conv2)
-h_pool2 = max_pool_2x2(h_conv2)
+h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
+# h_pool2 = max_pool_2x2(h_conv2)
 
 # third convolution layer
 W_conv3 = weight_variable([3, 3, 64, 64])
 b_conv3 = bias_variable([64])
 
-h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3, 1) + b_conv3)
-h_pool3 = max_pool_2x2(h_conv3)
+h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
+# h_pool3 = max_pool_2x2(h_conv3)
 
 # reshape
-h_pool3_flat = tf.reshape(h_pool3, [-1, 2 * 2 * 64])
+h_pool3_flat = tf.reshape(h_conv3, [-1, 10 * 10 * 64])
 
 # first fully connected layer
-W_fc1 = weight_variable([2 * 2 * 64, 512])
-b_fc1 = bias_variable([512])
+W_fc1 = weight_variable([10 * 10 * 64, 1024])
+b_fc1 = bias_variable([1024])
 
 h_fc1 = tf.nn.relu(tf.matmul(h_pool3_flat, W_fc1) + b_fc1)
 
@@ -87,7 +87,7 @@ keep_prob = tf.placeholder(tf.float32)
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 # output layer
-W_fc2 = weight_variable([512, 2])
+W_fc2 = weight_variable([1024, 2])
 b_fc2 = bias_variable([2])
 
 Q_output = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
