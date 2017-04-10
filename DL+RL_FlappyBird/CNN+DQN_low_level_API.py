@@ -18,7 +18,7 @@ from skimage import transform, color, exposure
 import cv2
 from matplotlib import pyplot as plt
 
-# 全局变量
+# hyperparameters
 ACTIONS = 2 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVATION = 1000. # timesteps to observe before training
@@ -28,9 +28,10 @@ INITIAL_EPSILON = 0.1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
 BATCH = 256 # size of minibatch
 FRAME_PER_ACTION = 1
+QTARGET_UPDATE_INTERVAL = 1000 # how often update Q target network parameters with the Q-network parameters
 
 '''
-封装
+private methods
 '''
 def weight_variable(shape):
     initial = tf.truncated_normal(shape = shape, stddev = 0.01)
@@ -47,7 +48,7 @@ def max_pool_2x2(x):
     return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = "SAME")
 
 '''
-创建CNN网络
+create Q network
 '''
 # input layer
 x_image = tf.placeholder(tf.float32, shape = [None, 80, 80, 4])
@@ -92,7 +93,55 @@ b_fc2 = bias_variable([2])
 
 Q_output = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 
-# 定义cost function
+
+'''
+create Q target network
+'''
+x_image_qtn = tf.placeholder(tf.float32, shape = [None, 80, 80, 4])
+
+# first convolution layer
+W_conv1_qtn = weight_variable([8, 8, 4, 32])
+b_conv1_qtn = bias_variable([32])
+
+h_conv1_qtn = tf.nn.relu(conv2d(x_image_qtn, W_conv1_qtn, 4) + b_conv1_qtn)
+#h_pool1 = max_pool_2x2(h_conv1)
+
+# second convolution layer
+W_conv2_qtn = weight_variable([4, 4, 32, 64])
+b_conv2_qtn = bias_variable([64])
+
+h_conv2_qtn = tf.nn.relu(conv2d(h_conv1_qtn, W_conv2_qtn, 2) + b_conv2_qtn)
+#h_pool2 = max_pool_2x2(h_conv2)
+
+# third convolution layer
+W_conv3_qtn = weight_variable([3, 3, 64, 64])
+b_conv3_qtn = bias_variable([64])
+
+h_conv3_qtn = tf.nn.relu(conv2d(h_conv2_qtn, W_conv3_qtn, 1) + b_conv3_qtn)
+# h_pool3 = max_pool_2x2(h_conv3)
+
+# reshape
+h_pool3_flat_qtn = tf.reshape(h_conv3_qtn, [-1, 10 * 10 * 64])
+
+# first fully connected layer
+W_fc1_qtn = weight_variable([10 * 10 * 64, 1024])
+b_fc1_qtn = bias_variable([1024])
+
+h_fc1_qtn = tf.nn.relu(tf.matmul(h_pool3_flat_qtn, W_fc1_qtn) + b_fc1_qtn)
+
+# drop
+keep_prob_qtn = tf.placeholder(tf.float32)
+h_fc1_drop_qtn = tf.nn.dropout(h_fc1_qtn, keep_prob_qtn)
+
+# output layer
+W_fc2_qtn = weight_variable([1024, 2])
+b_fc2_qtn = bias_variable([2])
+
+Q_output_qtn = tf.matmul(h_fc1_drop_qtn, W_fc2_qtn) + b_fc2_qtn
+
+
+
+# define cost function
 action_for_train = tf.placeholder(tf.float32, shape = [None, ACTIONS])
 Q_target = tf.placeholder(tf.float32, shape = [None])
 Q_value_for_train = tf.reduce_sum(tf.multiply(Q_output, action_for_train), axis = 1)
@@ -103,17 +152,30 @@ train_step = tf.train.AdamOptimizer(1e-6).minimize(cost_function)
 sess = tf.InteractiveSession()
 sess.run(tf.global_variables_initializer())
 
-# 初始化游戏
+
+sess.run([W_conv1_qtn.assign(W_conv1),
+          b_conv1_qtn.assign(b_conv1),
+          W_conv2_qtn.assign(W_conv2),
+          b_conv2_qtn.assign(b_conv2),
+          W_conv3_qtn.assign(W_conv3),
+          b_conv3_qtn.assign(b_conv3),
+          W_fc1_qtn.assign(W_fc1),
+          b_fc1_qtn.assign(b_fc1),
+          W_fc2_qtn.assign(W_fc2),
+          b_fc2_qtn.assign(b_fc2)])
+
+
+# initialize flappy bird
 flappyBird = game.GameState()
 
-# 存储replay memory
+# init replay memory
 D = deque()
 
-# 初始化action
+# init action
 action0 = np.zeros(ACTIONS)
 action0[0] = 1
 
-# 获取游戏初始化状态
+# get the first state of game
 observation0, reward0, terminal = flappyBird.frame_step(action0)
 
 # observation0 = skimage.color.rgb2gray(observation0)
@@ -121,7 +183,7 @@ observation0, reward0, terminal = flappyBird.frame_step(action0)
 # observation0 = skimage.exposure.rescale_intensity(observation0, out_range = (0, 255))
 # state0 = np.stack((observation0, observation0, observation0, observation0), axis = 2)
 
-# 图像处理，画面压缩为80*80，黑白二值化
+# image processing, compress it to 80*80 and only retain black and white
 observation0 = cv2.cvtColor(observation0, cv2.COLOR_BGR2GRAY)
 observation0 = cv2.resize(observation0, (80, 80), interpolation = cv2.INTER_AREA)
 ret, observation0 = cv2.threshold(observation0, 10, 255, cv2.THRESH_BINARY)
@@ -131,20 +193,20 @@ state_current = state0
 # plt.imshow(observation0,'gray')
 # plt.show()
 
-# 初始化参数
+# init some parameters
 epsilon = INITIAL_EPSILON
 time = 0
 
-# 记录游戏分数
+# record the game score
 score = 0
 max_score = 0
 f = open("score.txt", 'a')
 f.write("\n")
 
-# 开始游戏
+# start game
 while (True):
 
-    # 根据当前状态求出两个action的Q value
+    # compute the Q value of two actions by using current state
     Q_value = Q_output.eval(feed_dict = {x_image: [state_current], keep_prob: 1.0})
 
     action = np.zeros(ACTIONS)
@@ -152,22 +214,22 @@ while (True):
 
     if time % FRAME_PER_ACTION == 0:
         if random.random() <= epsilon:
-            # 随机选一种action
+            # select the action randomly
             print("----------Random Action----------")
             action_index = random.randrange(ACTIONS)
             action[action_index] = 1
         else:
-            # 选Q value大的action
+            # select the action with max Q value
             action_index = np.argmax(Q_value)
             action[action_index] = 1
     else:
         action[action_index] = 1
 
-    # 更新epsilon
+    # update epsilon
     if epsilon > FINAL_EPSILON and time > OBSERVATION:
         epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
-    # 根据action获取到reward以及下一状态
+    # get the next state
     observation, reward, terminal = flappyBird.frame_step(action)
 
     # observation = skimage.color.rgb2gray(observation)
@@ -176,7 +238,7 @@ while (True):
     # observation = np.reshape(observation, (80, 80, 1))
     # state_next = np.append(state_current[:, :, 1:], observation, axis = 2)
 
-    # 图像处理，同上
+    # the same image processing as above 
     observation = cv2.cvtColor(observation, cv2.COLOR_BGR2GRAY)
     observation = cv2.resize(observation, (80, 80), interpolation = cv2.INTER_AREA)
     ret, observation = cv2.threshold(observation, 10, 255, cv2.THRESH_BINARY)
@@ -185,7 +247,7 @@ while (True):
     observation = np.reshape(observation, (80, 80, 1))
     state_next = np.append(state_current[:, :, 1:], observation, axis = 2)
 
-    # 更新分数
+    # update the game score
     if reward == -1:
         f.write(str(score) + ",")
         if score > max_score:
@@ -194,21 +256,23 @@ while (True):
     if reward == 1:
         score += 1
 
-    # 把当前的experience存下来
+    # store current experience to the replay memory
     D.append((state_current, action, reward, state_next, terminal))
     if len(D) > REPLAY_MEMORY:
         D.popleft()
 
-    # 进入training
+    # start training
     if time > OBSERVATION:
 
         '''
-        没有fixed Q learning target的DQN算法
+	NIPS DQN with no fixed Q target network parameters
+	Change it to Nature DQN with fixed Q target network parameters
         '''
-        # 随机从memory中抽取minibatch
-        minibatch = random.sample(D, BATCH)
 
-        # 从minibatch中取得各个变量的值
+	# sample minibatch from replay memory randomly
+        minibatch = random.sample(D, BATCH)
+	
+	# get variable value from minibatch
         state_current_batch = []
         action_batch = []
         reward_batch = []
@@ -221,8 +285,8 @@ while (True):
             state_next_batch.append(minibatch[i][3])
             terminal_batch.append(minibatch[i][4])
 
-        # 计算Q learning target
-        Q_value_batch = Q_output.eval(feed_dict = {x_image: state_next_batch, keep_prob: 1.0})
+        # compute Q learning target
+        Q_value_batch = Q_output_qtn.eval(feed_dict = {x_image_qtn: state_next_batch, keep_prob_qtn: 1.0})
         Q_target_batch = []
         for i in range(0, len(minibatch)):
             if terminal_batch[i]:
@@ -230,17 +294,31 @@ while (True):
             else:
                 Q_target_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
 
-        # 训练网络，minimize cost function
+        # train the network，minimize cost function
         train_step.run(feed_dict = {x_image: state_current_batch,
                                     action_for_train: action_batch,
                                     Q_target: Q_target_batch,
                                     keep_prob: 0.5})
 
-    # 进入下一时刻
+	# update Q target network parameters
+	if time % QTARGET_UPDATE_INTERVAL == 0:
+            qtnassign = [W_conv1_qtn.assign(W_conv1),
+                      b_conv1_qtn.assign(b_conv1),
+                      W_conv2_qtn.assign(W_conv2),
+                      b_conv2_qtn.assign(b_conv2),
+                      W_conv3_qtn.assign(W_conv3),
+                      b_conv3_qtn.assign(b_conv3),
+                      W_fc1_qtn.assign(W_fc1),
+                      b_fc1_qtn.assign(b_fc1),
+                      W_fc2_qtn.assign(W_fc2),
+                      b_fc2_qtn.assign(b_fc2)]
+            sess.run(qtnassign)	
+
+    # time lapse
     state_current = state_next
     time += 1
 
-    # 打印信息
+    # print information
     state = ""
     if time <= OBSERVATION:
         state = "observe"
