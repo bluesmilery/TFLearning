@@ -6,3 +6,7 @@ DL+RL_FlappyBird文件夹中是结合Deep learning与Reinforcement learning，�
 
 * low level API是使用tf.nn等基础API进行编程
 * high level API是使用tf.contrib.learn、tf.layers等更高层封装的API进行编程
+
+论文阅读
+* Playing Atari with Deep Reinforcement Learning
+* Human-level Control through Deep Reinforcement Learning
