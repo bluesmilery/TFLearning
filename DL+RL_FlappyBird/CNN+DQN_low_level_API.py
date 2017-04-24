@@ -33,7 +33,6 @@ QTARGET_UPDATE_INTERVAL = 1000  # how often update Q target network parameters w
 private methods
 '''
 
-
 def weight_variable(shape):
     initial = tf.truncated_normal(shape=shape, stddev=0.01)
     return tf.Variable(initial)
@@ -219,6 +218,7 @@ while (True):
         '''
 	    NIPS DQN with no fixed Q target network parameters
 	    Change it to Nature DQN with fixed Q target network parameters
+	    Change it to Double Q-Learning
         '''
 
         # sample minibatch from replay memory randomly
@@ -238,13 +238,25 @@ while (True):
             terminal_batch.append(minibatch[i][4])
 
         # compute Q learning target
-        Q_value_batch = sess_qtn.run(Q_output_qtn, feed_dict={x_image_qtn: state_next_batch, keep_prob_qtn: 1.0})
+        A_Q_value_batch = sess_q.run(Q_output, feed_dict = {x_image: state_next_batch, keep_prob: 1.0})
+        A_action_batch = np.argmax(A_Q_value_batch, axis = 1)
+
+        B_Q_value_batch = sess_qtn.run(Q_output_qtn, feed_dict = {x_image_qtn: state_next_batch, keep_prob_qtn: 1.0})
+
         Q_target_batch = []
         for i in range(0, len(minibatch)):
             if terminal_batch[i]:
                 Q_target_batch.append(reward_batch[i])
             else:
-                Q_target_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
+                Q_target_batch.append(reward_batch[i] + GAMMA * B_Q_value_batch[i][A_action_batch[i]])
+
+        # Q_value_batch = sess_qtn.run(Q_output_qtn, feed_dict={x_image_qtn: state_next_batch, keep_prob_qtn: 1.0})
+        # Q_target_batch = []
+        # for i in range(0, len(minibatch)):
+        #     if terminal_batch[i]:
+        #         Q_target_batch.append(reward_batch[i])
+        #     else:
+        #         Q_target_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
 
         # train the network£¬minimize cost function
         sess_q.run(train_step, feed_dict={x_image: state_current_batch,
