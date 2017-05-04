@@ -2,7 +2,7 @@
 依照TF官方教程学习使用TensorFlow
 https://www.tensorflow.org/get_started/get_started
 
-DL+RL_FlappyBird文件夹中是结合Deep learning与Reinforcement learning，使用DQN算法开发程序自己玩Flappy bird。参照这篇文章来进行开发的：https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
+DL+RL_FlappyBird文件夹中是仿照DeepMind使用Deep Reinforcement Learning玩Atari系列游戏，将其移植到Flappy Bird游戏上。项目使用Python脚本语言进行编程，使用TensorFlow框架开发。参照这篇文章来进行开发的：https://yanpanlau.github.io/2016/07/10/FlappyBird-Keras.html
 
 目前DQN算法实现的版本有：
 * **NIPS DQN**(experience replay)
