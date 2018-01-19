@@ -38,15 +38,20 @@ def plot_results(predicted_data, true_data):
 
 if __name__ == '__main__':
     time_step = 14
-    filename = sd.get_stock_data()
+    # filename = sd.get_stock_data()
+    filename = '300027.csv'
     x_train, y_train, x_test, y_test = sd.process_data(filename=filename,
                                                        time_step=time_step,
                                                        train_percentage=0.9,
                                                        is_normalized=True)
 
-    model = nm.LSTM_Model(learning_rate=0.001,
-                          time_step=time_step,
-                          layers_size=[1, 50, 100, 1])
+    model = nm.SFM_Model(learning_rate=0.001,
+                         time_step=time_step,
+                         layers_size=[1, 50, 1],
+                         freq_size=[10],
+                         batch_size=128,
+                         num_epoch=100)
+
 
     model.build_model()
 
@@ -57,13 +62,11 @@ if __name__ == '__main__':
         model.train_process(x=x_train[:, :, np.newaxis],
                             y=y_train[:, np.newaxis],
                             keep_prob=0.8,
-                            num_epoch=50,
-                            batch_size=128,
                             sess=sess)
 
         y_predict = model.predict_process(x=x_test[:, :, np.newaxis],
                                           y=y_test[:, np.newaxis],
                                           sess=sess,
-                                          type=3)
+                                          type=1)
 
     plot_results(y_predict, y_test)
